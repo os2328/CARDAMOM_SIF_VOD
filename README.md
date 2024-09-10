@@ -2,6 +2,9 @@
 Data and scripts for "Constraining respiration flux and carbon pools in a simple ecosystem carbon model"
 
 
+See improved_runs_revision_and_figures.ipynb for Figures.
+
+
 The work uses CARDAMOM v.1 (https://github.com/CARDAMOM-framework/CARDAMOM/)
 
 The base DALEC is DALEC 813. The new DALEC is called DALEC 895
