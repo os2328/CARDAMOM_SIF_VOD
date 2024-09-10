@@ -39,57 +39,65 @@ Note: This file contains all the parameters used by this DALEC. Order is importa
 
 Add all the necessary variable’s quantities to /C/projects/CARDAMOM_GENERAL/CARDAMOM_DATA_STRUCTURE.c (e.g. follow “GPP” entry as example)
 
-double *SIF; /*observations themselves*/ 
-int *sifpts;
-int nsif; /* Number of non-empty points in observation*/
-double *M_SIF; /*SIF values CALCULATED BY THE MODEL*/
-double sif_annual_unc; /* needed for DALEC_LIKELIHOOD_SIF.c NOT always calculated*/
-double sif_obs_unc; /* can be calculated as observations’ std  – not implemented*/
-double sif_obs_threshold; /* needed for DALEC_LIKELIHOOD_SIF.c */
+		double *SIF; /*observations themselves*/ 
+		int *sifpts;
+		int nsif; /* Number of non-empty points in observation*/
+		double *M_SIF; /*SIF values CALCULATED BY THE MODEL*/
+		double sif_annual_unc; /* needed for DALEC_LIKELIHOOD_SIF.c NOT always calculated*/
+		double sif_obs_unc; /* can be calculated as observations’ std  – not implemented*/
+		double sif_obs_threshold; /* needed for DALEC_LIKELIHOOD_SIF.c */
 
 
 Provide the information on how the new data was included in .cbf file. Add to CARDAMOM_READ_BINARY_DATA.c
-	This is just for printout while running
-printf("Number of SIF obs. = %d\n",CDATA->nsif);
-	Currently, uncertainty is hard coded rather than calculated. Also, not sure about statdat indexing
-DATA->sif_obs_unc=statdat[27];if (statdat[27]<0){DATA->sif_obs_unc=0.6;}
+This is just for printout while running
 
-Memory allocation for the new data, calculated by the model and observed. Then freeing the space 
-DATA->M_SIF=calloc(DATA->nodays,sizeof(double));
-if (DATA->SIF==0){DATA->SIF=calloc(DATA->nodays,sizeof(double));}
-if (DATA->nsif>0){DATA->sifpts=calloc(DATA->nsif,sizeof(int));} 
+		printf("Number of SIF obs. = %d\n",CDATA->nsif);
+  
+Currently, uncertainty is hard coded rather than calculated. Also, not sure about statdat indexing
 
-if (DATA.nsif>0){free(DATA.sifpts);} 
-free(DATA.SIF);
-free(DATA.M_SIF);
+		DATA->sif_obs_unc=statdat[27];if (statdat[27]<0){DATA->sif_obs_unc=0.6;}
 
+Memory allocation for the new data, calculated by the model and observed. Then freeing the space
+
+		DATA->M_SIF=calloc(DATA->nodays,sizeof(double));
+		if (DATA->SIF==0){DATA->SIF=calloc(DATA->nodays,sizeof(double));}
+		if (DATA->nsif>0){DATA->sifpts=calloc(DATA->nsif,sizeof(int));} 
+
+		if (DATA.nsif>0){free(DATA.sifpts);} 
+		free(DATA.SIF);
+		free(DATA.M_SIF);
+
+Repeat for VOD
 
 Reading and adding non-empty observations
-DATA->nsif=0;
+		
+  		DATA->nsif=0;
+    
 Then, in a loop
-if (DATA->noobs>11){DATA->SIF[n]=obsline[11];
-      	if (obsline[11]>-9998){DATA->nsif=DATA->nsif+1;}}   /*this should correspond to a new field; SIF added after CH4 in write binary.m */
+
+		if (DATA->noobs>11){DATA->SIF[n]=obsline[11];
+      		if (obsline[11]>-9998){DATA->nsif=DATA->nsif+1;}}   /*this should correspond to a new field; SIF added after CH4 in write binary.m */
 
 IMPORTANT NOTE: in DALEC 813, there was an option for CH4 and NEE and they where the observation number 11. However, they are absent in the corresponding .cbf files AND mre importantly, in obsnames in readwritebinary.py. Hence, if a new observation is added – it becomes the 11th observation. For that reason, the CH4 lines were commented in the code above. Same is true for the lines 
 
-if (DATA->noobs>11){c=0;for (n=0;n<DATA->nodays;n++){if (DATA->SIF[n]>-9998){DATA->sifpts[c]=n;c=c+1;}}} 
+		if (DATA->noobs>11){c=0;for (n=0;n<DATA->nodays;n++){if (DATA->SIF[n]>-9998){DATA->sifpts[c]=n;c=c+1;}}} 
 
-	Data initialization 
-CDATA->SIF=0; 
+Data initialization 
+
+		CDATA->SIF=0; 
 
 Changing the actual model.
 
 Changing the model means adding to the DALEC_895.c.  In my case, inside the last loop,
 
-double *SIF=DATA.M_SIF;
+		double *SIF=DATA.M_SIF;
 
+    		/*SIF model*/
+    		SIF[n] = FLUXES[f+0]*pars[33];
 
-    /*SIF model*/
-    SIF[n] = FLUXES[f+0]*pars[33];
-
-	/*VOD */
-	double c = 0.0;
-	VOD[n]=  pars[34]*POOLS[p+3] + pars[35]*POOLS[p+1]+c;
+		/*VOD */
+		double c = 0.0;
+		VOD[n]=  pars[34]*POOLS[p+3] + pars[35]*POOLS[p+1]+c;
 
 Pars[33], [34], and [35] correspond to the newly defined model parameters from step 2 (as mentioned, the order is important, the parameters are called by their indices in the code). 
 
@@ -97,31 +105,33 @@ Pars[33], [34], and [35] correspond to the newly defined model parameters from s
 Adding new cost function. 
 
 In this new model, a new observation is included for DA. Hence, a new cost function is needed. In my case, the new cost function is DALEC_LIKELIHOOD_SIF.c and DALEC_LIKELIHOOD_VOD.c  in /C/projects/DALEC_CODE/MODEL_LIKELIHOOD_FUNCTIONS/
-+ add to all likelihoods
-#include "DALEC_LIKELIHOOD_SIF.c"
-#include "DALEC_LIKELIHOOD_VOD.c"
+and add to all likelihoods
+  
+	#include "DALEC_LIKELIHOOD_SIF.c"
+	#include "DALEC_LIKELIHOOD_VOD.c"
 
 The cost function basically repeats NEE function, though decoupling seasonal from interannual variations is not implemented. 
 
-for (n=0;n<D.nsif;n++){dn=D.sifpts[n];tot_exp+=pow((D.M_SIF[dn]-D.SIF[dn])/sif_obs_unc,2);}
-P=P-0.5*tot_exp;
-return P;
+		for (n=0;n<D.nsif;n++){dn=D.sifpts[n];tot_exp+=pow((D.M_SIF[dn]-D.SIF[dn])/sif_obs_unc,2);}
+		P=P-0.5*tot_exp;
+		return P;
 
 Same is repeated for VOD: 
 
-for (n=0;n<D.nvod;n++){dn=D.vodpts[n];tot_exp+=pow((D.M_VOD[dn]-D.VOD[dn])/vod_obs_unc,2);}
-P=P-0.5*tot_exp;
-return P;
+		for (n=0;n<D.nvod;n++){dn=D.vodpts[n];tot_exp+=pow((D.M_VOD[dn]-D.VOD[dn])/vod_obs_unc,2);}
+		P=P-0.5*tot_exp;
+		return P;
 
 Then, in DALEC_ALL_LIKELIHOOD.c
 
-f (D.ID==895){
+	if (D.ID==895){
 	P=P+DALEC_LIKELIHOOD_SIF(D);//
-	P=P+DALEC_LIKELIHOOD_VOD(D);//}
+	P=P+DALEC_LIKELIHOOD_VOD(D);//
+ 	}
 
 
 Changes made to readwritebinary.py and CARDAMOM_WRITE_BINARY_FILEFORMAT.m files. 
 Adding new SIF and VOD observation (everywhere in the file where obsnames are mentioned)
 
-obsnames=['GPP','LAI','NBE','ABGB','ET','EWT','BAND1','BAND2','BAND3','BAND4','SOM', 'SIF', 'VOD']   
+	obsnames=['GPP','LAI','NBE','ABGB','ET','EWT','BAND1','BAND2','BAND3','BAND4','SOM', 'SIF', 'VOD']   
 
